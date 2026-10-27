@@ -1,4 +1,4 @@
-import { deriveSession, decryptText } from './crypto.mjs';
+import { unlockPayload, decryptApplication } from './crypto.mjs';
 const payload=JSON.parse(document.getElementById('payload').textContent);
 const form=document.getElementById('form'), message=document.getElementById('message');
 const prefix='yj-v3:'+new URL('.',location.href).pathname+':';
@@ -41,8 +41,8 @@ form.addEventListener('submit',async event=>{
   busy=true;document.getElementById('unlock').disabled=true;message.textContent='地図を開いています…';
   let session,html;
   try {
-    session=await deriveSession(document.getElementById('password').value,payload.salt,payload.mapSalt);
-    html=await decryptText(session.key,payload);
+    session=await unlockPayload(document.getElementById('password').value,payload);
+    html=await decryptApplication(session,payload);
   } catch {
     const failures=lock.failures+1;saveLock({failures:failures>=5?0:failures,until:failures>=5?Date.now()+30000:0});
     message.textContent=failures>=5?'合言葉が違います。30秒待ってから試してください。':'合言葉が違います。';
@@ -59,7 +59,7 @@ if(!crypto.subtle){message.textContent='HTTPSまたはlocalhostで開いてく�
 else {
   try{
     const saved=await keyStore('readonly',s=>s.get('session'));
-    if(saved?.version===payload.version) await launch(saved,await decryptText(saved.key,payload));
+    if(saved?.version===payload.version) await launch(saved,await decryptApplication(saved,payload));
     else if(saved) await keyStore('readwrite',s=>s.clear());
   }catch{try{await keyStore('readwrite',s=>s.clear())}catch{}}
 }
