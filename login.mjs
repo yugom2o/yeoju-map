@@ -65,7 +65,8 @@ else {
 }
 if('serviceWorker' in navigator) {
   try {
-    const registration=await navigator.serviceWorker.register('./sw.js');
+    const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
+    await registration.update();
     await navigator.serviceWorker.ready;
     document.getElementById('offline').textContent='オフラインで開く準備ができました。';
     registration.addEventListener('updatefound',()=>{document.getElementById('offline').textContent='新しい版を準備しています。次回起動時に反映されます。'});
