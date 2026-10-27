@@ -28,7 +28,7 @@ export async function createUserPayload(html, config) {
   const key=await crypto.subtle.importKey('raw',unb64(config.contentKey),'AES-GCM',false,['encrypt','decrypt']);
   const users=[];
   for(const user of config.users) {
-    if(!user.id||!user.name||[...user.password].length<12)throw new Error('利用者情報または合言葉が不正です');
+    if(!user.id||!user.name||typeof user.password!=='string'||user.password.length===0)throw new Error('利用者情報または合言葉が不正です');
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),mapSalt=b64(crypto.getRandomValues(new Uint8Array(16)));
     const wrapper=await deriveSession(user.password,salt,mapSalt);
     const encrypted=await encryptText(wrapper.key,JSON.stringify({contentKey:config.contentKey,mapId:config.mapId,userId:user.id,name:user.name}));
