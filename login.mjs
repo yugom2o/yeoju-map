@@ -1,4 +1,4 @@
-import { unlockPayload, decryptApplication } from './crypto.mjs';
+import { unlockPayload, decryptApplication, decryptText } from './crypto.mjs';
 const payload=JSON.parse(document.getElementById('payload').textContent);
 const form=document.getElementById('form'), message=document.getElementById('message');
 const prefix='yj-v3:'+new URL('.',location.href).pathname+':';
@@ -19,7 +19,8 @@ const getLock=()=>{try{return JSON.parse(localStorage.getItem(prefix+'lock'))||{
 const saveLock=value=>{try{localStorage.setItem(prefix+'lock',JSON.stringify(value))}catch{}};
 let busy=false;
 async function launch(session,html) {
-  window.YJ_SESSION={...session,prefix:prefix+session.mapId+':'};
+  const cloudCredentials=session.cloudSealed?JSON.parse(await decryptText(session.key,session.cloudSealed)):null;
+  window.YJ_SESSION={...session,cloudCredentials,prefix:prefix+session.mapId+':'};
   window.YJ_LOGOUT=async()=>{
     // Tear down the application before clearing storage: outstanding callbacks in
     // the old document must not write its in-memory marks back during reload.
@@ -66,7 +67,7 @@ else {
 if('serviceWorker' in navigator) {
   try {
     const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
-    await registration.update();
+    try{await registration.update()}catch{}
     await navigator.serviceWorker.ready;
     document.getElementById('offline').textContent='オフラインで開く準備ができました。';
     registration.addEventListener('updatefound',()=>{document.getElementById('offline').textContent='新しい版を準備しています。次回起動時に反映されます。'});

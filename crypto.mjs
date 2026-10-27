@@ -31,7 +31,8 @@ export async function createUserPayload(html, config) {
     if(!user.id||!user.name||typeof user.password!=='string'||user.password.length===0)throw new Error('利用者情報または合言葉が不正です');
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),mapSalt=b64(crypto.getRandomValues(new Uint8Array(16)));
     const wrapper=await deriveSession(user.password,salt,mapSalt);
-    const encrypted=await encryptText(wrapper.key,JSON.stringify({contentKey:config.contentKey,mapId:config.mapId,userId:user.id,name:user.name}));
+    const cloudSealed=user.cloudCredentials?await encryptText(key,JSON.stringify(user.cloudCredentials)):null;
+    const encrypted=await encryptText(wrapper.key,JSON.stringify({contentKey:config.contentKey,mapId:config.mapId,userId:user.id,name:user.name,cloudSealed}));
     users.push({salt,mapSalt,...encrypted});
   }
   return {format:2,app:await encryptText(key,html),users};
@@ -43,7 +44,7 @@ export async function unlockPayload(password,payload) {
     let data;
     try{data=JSON.parse(await decryptText(wrapper.key,user))}catch{continue}
     const key=await crypto.subtle.importKey('raw',unb64(data.contentKey),'AES-GCM',false,['encrypt','decrypt']);
-    return {key,mapId:data.mapId,userId:data.userId,name:data.name};
+    return {key,mapId:data.mapId,userId:data.userId,name:data.name,cloudSealed:data.cloudSealed||null};
   }
   throw new Error('合言葉が違います');
 }
