@@ -1,5 +1,5 @@
 const ROOT=new URL('.',self.location.href);
-const CACHE='yj-v3:'+ROOT.pathname+':e8e2cfa62b7b156c';
+const CACHE='yj-v3:'+ROOT.pathname+':a037f4e0f0efe137';
 const FILES=['./','./index.html','./login.mjs','./crypto.mjs','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES.map(path=>new Request(new URL(path,ROOT),{cache:'reload'}))))));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
