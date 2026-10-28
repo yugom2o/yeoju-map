@@ -1,4 +1,5 @@
 import { unlockPayload, decryptApplication, decryptText } from './crypto.mjs';
+import {registerPasskey,unlockPasskey} from './passkey.mjs';
 const payload=JSON.parse(document.getElementById('payload').textContent);
 const form=document.getElementById('form'), message=document.getElementById('message');
 const prefix='yj-v3:'+new URL('.',location.href).pathname+':';
@@ -17,7 +18,27 @@ async function keyStore(mode, operation) {
 }
 const getLock=()=>{try{return JSON.parse(localStorage.getItem(prefix+'lock'))||{failures:0,until:0}}catch{return {failures:0,until:0}}};
 const saveLock=value=>{try{localStorage.setItem(prefix+'lock',JSON.stringify(value))}catch{}};
-let busy=false;
+let busy=false,registrationPassword='';
+const passkeyButton=document.getElementById('passkeyUnlock');
+window.YJ_REGISTER_PASSKEY=async()=>{
+  if(!registrationPassword)throw new Error('一度ログアウトし、合言葉でログインしてから登録してください。');
+  try{
+    const record=await registerPasskey(registrationPassword,{id:window.YJ_SESSION.userId,name:window.YJ_SESSION.name});
+    await keyStore('readwrite',s=>s.put(record,'passkey'));
+    await keyStore('readwrite',s=>s.delete('session'));
+  }catch(error){if(error.name==='NotAllowedError')throw new Error('端末での登録が中止されたか、対応していません。合言葉は引き続き使えます。');throw error}
+};
+window.YJ_REMOVE_PASSKEY=()=>keyStore('readwrite',s=>s.delete('passkey'));
+passkeyButton.onclick=async()=>{
+  if(busy)return;busy=true;passkeyButton.disabled=true;message.textContent='端末で認証してください…';
+  try{
+    const record=await keyStore('readonly',s=>s.get('passkey'));
+    const password=await unlockPasskey(record),session=await unlockPayload(password,payload);
+    registrationPassword=password;await launch(session,await decryptApplication(session,payload));
+  }catch{message.textContent='パスキーで開けませんでした。再試行するか、合言葉で開いてください。'}
+  finally{busy=false;passkeyButton.disabled=false}
+};
+try{const record=await keyStore('readonly',s=>s.get('passkey'));passkeyButton.hidden=!record}catch{}
 async function launch(session,html) {
   const cloudCredentials=session.cloudSealed?JSON.parse(await decryptText(session.key,session.cloudSealed)):null;
   window.YJ_SESSION={...session,cloudCredentials,prefix:prefix+session.mapId+':'};
@@ -26,9 +47,10 @@ async function launch(session,html) {
     // the old document must not write its in-memory marks back during reload.
     const scope=window.YJ_SESSION.prefix;
     document.querySelector('iframe')?.remove();
-    try{await keyStore('readwrite',s=>s.clear())}catch{}
+    try{await keyStore('readwrite',s=>s.delete('session'))}catch{}
     for(const key of Object.keys(localStorage)) if(key.startsWith(scope)) localStorage.removeItem(key);
     window.YJ_SESSION=null;
+    registrationPassword='';
     location.reload();
   };
   const frame=document.createElement('iframe');
@@ -42,8 +64,10 @@ form.addEventListener('submit',async event=>{
   busy=true;document.getElementById('unlock').disabled=true;message.textContent='地図を開いています…';
   let session,html;
   try {
-    session=await unlockPayload(document.getElementById('password').value,payload);
+    const password=document.getElementById('password').value;
+    session=await unlockPayload(password,payload);
     html=await decryptApplication(session,payload);
+    registrationPassword=password;
   } catch {
     const failures=lock.failures+1;saveLock({failures:failures>=5?0:failures,until:failures>=5?Date.now()+30000:0});
     message.textContent=failures>=5?'合言葉が違います。30秒待ってから試してください。':'合言葉が違います。';
@@ -53,7 +77,7 @@ form.addEventListener('submit',async event=>{
   if(document.getElementById('remember').checked) {
     try{await keyStore('readwrite',s=>s.put({...session,version:payload.version},'session'))}
     catch{message.textContent='この端末では合言葉を記憶できません。'}
-  } else {try{await keyStore('readwrite',s=>s.clear())}catch{}}
+  } else {try{await keyStore('readwrite',s=>s.delete('session'))}catch{}}
   await launch(session,html);
 });
 if(!crypto.subtle){message.textContent='HTTPSまたはlocalhostで開いてください。';document.getElementById('unlock').disabled=true}
@@ -61,8 +85,8 @@ else {
   try{
     const saved=await keyStore('readonly',s=>s.get('session'));
     if(saved?.version===payload.version) await launch(saved,await decryptApplication(saved,payload));
-    else if(saved) await keyStore('readwrite',s=>s.clear());
-  }catch{try{await keyStore('readwrite',s=>s.clear())}catch{}}
+    else if(saved) await keyStore('readwrite',s=>s.delete('session'));
+  }catch{try{await keyStore('readwrite',s=>s.delete('session'))}catch{}}
 }
 if('serviceWorker' in navigator) {
   try {
