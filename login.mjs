@@ -29,6 +29,27 @@ window.YJ_REGISTER_PASSKEY=async()=>{
   }catch(error){if(error.name==='NotAllowedError')throw new Error('端末での登録が中止されたか、対応していません。合言葉は引き続き使えます。');throw error}
 };
 window.YJ_REMOVE_PASSKEY=()=>keyStore('readwrite',s=>s.delete('passkey'));
+window.YJ_CHECK_DEVICE=async()=>{
+  let offlineState='unavailable';
+  const controller=navigator.serviceWorker?.controller;
+  if(controller){
+    try{
+      const result=await new Promise((resolve,reject)=>{
+        const channel=new MessageChannel(),timer=setTimeout(()=>{channel.port1.close();channel.port2.close();reject(new Error('timeout'))},2500);
+        channel.port1.onmessage=event=>{clearTimeout(timer);channel.port1.close();channel.port2.close();resolve(event.data)};
+        controller.postMessage({type:'YJ_OFFLINE_STATUS'},[channel.port2]);
+      });
+      offlineState=result.version!==payload.version?'update':result.complete?'ready':'incomplete';
+    }catch{offlineState='unknown'}
+  }
+  let passkey=false,remembered=false,storageReadable=true;
+  try{
+    const saved=await keyStore('readonly',s=>s.get('session'));
+    remembered=saved?.version===payload.version;
+    passkey=!!(await keyStore('readonly',s=>s.get('passkey')));
+  }catch{storageReadable=false}
+  return {offlineState,passkey,remembered,storageReadable,checkedAt:Date.now()};
+};
 passkeyButton.onclick=async()=>{
   if(busy)return;busy=true;passkeyButton.disabled=true;message.textContent='端末で認証してください…';
   try{
