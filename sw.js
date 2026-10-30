@@ -1,5 +1,5 @@
 const ROOT=new URL('.',self.location.href);
-const VERSION='f461ed6e4cd8334f';
+const VERSION='0ace4adcdc76012c';
 const CACHE='yj-v3:'+ROOT.pathname+':'+VERSION;
 const FILES=['./','./index.html','./login.mjs','./crypto.mjs','./passkey.mjs','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 // Inspect the actual controlling worker and its cache; no network fetch is made.
